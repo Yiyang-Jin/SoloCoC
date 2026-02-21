@@ -17,6 +17,7 @@ import coc_dice
 import coc_storage
 import coc_qwen
 import coc_rag
+import coc_map
 import coc_log
 import coc_importer
 import coc_constants
@@ -291,6 +292,58 @@ def coc_list_scripts():
     return coc_rag.list_scripts()
 
 
+@app.get("/api/coc/maps")
+def coc_list_maps():
+    return coc_map.list_maps()
+
+
+def _map_media_type(path: Path) -> str:
+    ext = str(path).lower().split(".")[-1] if "." in str(path) else ""
+    if ext in ("png",): return "image/png"
+    if ext in ("jpg", "jpeg",): return "image/jpeg"
+    if ext in ("webp",): return "image/webp"
+    return "application/octet-stream"
+
+
+@app.get("/api/coc/maps/{map_id}/image")
+def coc_get_map_image(map_id: str):
+    p = coc_map.get_map_image_path(map_id)
+    if not p or not p.exists():
+        raise HTTPException(404, "地图不存在")
+    return FileResponse(str(p), media_type=_map_media_type(p))
+
+
+@app.post("/api/coc/maps/upload")
+async def coc_upload_map(file: UploadFile = File(...), map_id: str = Form(None)):
+    if not file.filename:
+        raise HTTPException(400, "请选择文件")
+    ext = Path(file.filename).suffix.lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".webp", ".bmp"):
+        raise HTTPException(400, "仅支持 PNG/JPG/JPEG/WEBP/BMP 图片")
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+    try:
+        ok, msg, mid = coc_map.process_map_upload(tmp_path, map_id)
+        if not ok:
+            raise HTTPException(400, msg)
+        return {"map_id": mid, "message": msg}
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+
+@app.delete("/api/coc/maps/{map_id}")
+def coc_delete_map_api(map_id: str):
+    if not coc_map.delete_map(map_id):
+        raise HTTPException(404, "地图不存在")
+    return {"message": "ok"}
+
+
 @app.get("/api/coc/kp-prompt")
 def coc_get_kp_prompt():
     return {"prompt": coc_qwen._load_kp_prompt()}
@@ -347,6 +400,9 @@ def coc_kp_chat_api(req: KpChatReq):
     if not req.script_id:
         raise HTTPException(400, "请先上传剧本")
     script_context = coc_rag.retrieve(req.script_id, req.message)
+    map_list = coc_map.get_all_maps_for_prompt()
+    context_for_map = (req.message or "") + "\n" + (script_context or "")
+    map_image_path = coc_map.get_image_path_for_context(context_for_map)
     character = coc_storage.get_character(req.character_id) if req.character_id else None
     history_path = Path(config.COC_SESSIONS_DIR) / f"{req.session_id}.json"
     history = []
@@ -359,6 +415,8 @@ def coc_kp_chat_api(req: KpChatReq):
     gen = settings_store.get_settings()
     reply = coc_qwen.kp_chat(
         script_context=script_context,
+        map_list=map_list,
+        map_image_path=map_image_path,
         chat_history=history,
         user_message=req.message,
         character_card=character,

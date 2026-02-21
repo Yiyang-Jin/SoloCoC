@@ -1,4 +1,5 @@
 """CoC 模块专用 LLM 调用：人物卡生成、KP 扮演。统一使用 OpenAI 兼容 API。"""
+import base64
 import json
 import re
 from pathlib import Path
@@ -328,6 +329,38 @@ def infer_character_action(
     )
 
 
+def _image_to_data_uri(file_path: str | Path) -> Optional[str]:
+    """将本地图片转为 data URI，供多模态 API 使用。"""
+    try:
+        path = Path(file_path)
+        if not path.exists() or not path.is_file():
+            return None
+        raw = path.read_bytes()
+        b64 = base64.standard_b64encode(raw).decode("ascii")
+        ext = path.suffix.lower()
+        mime = "image/png" if ext == ".png" else "image/jpeg" if ext in (".jpg", ".jpeg") else "image/webp" if ext == ".webp" else "image/bmp" if ext == ".bmp" else "image/png"
+        return f"data:{mime};base64,{b64}"
+    except Exception:
+        return None
+
+
+def _format_map_eval_prompt(map_list: list[dict], will_attach_image: bool = False) -> str:
+    """构建地图强制判断的提示块。注入全部地图文件名，由 LLM 判断是否适用。"""
+    lines = ["【地图模块 - 强制判断】以下是可用地图列表（按文件名）。你必须在回复开头先完成："]
+    lines.append("1) 判断是否有某张地图适用于当前情境；若有，指明「适用地图：文件名」；若无，说明「无适用地图」")
+    lines.append("2) 简要复述玩家/角色的请求")
+    lines.append("3) 指出可能存在的疑问或歧义（若无则写「无」）")
+    lines.append("完成上述三项后，再按 KP 身份正常推进剧情。")
+    if will_attach_image:
+        lines.append("（系统已附上当前相关的地图图像，请结合图像内容进行识别与描述。）")
+    lines.append("")
+    lines.append("可用地图：")
+    for m in map_list:
+        fn = m.get("filename", "未命名")
+        lines.append(f"- {fn}")
+    return "\n".join(lines)
+
+
 def _load_kp_prompt() -> str:
     """加载 KP 预制 prompt：优先 data/coc/kp_prompt.txt，否则用 defaults/kp_prompt.txt。"""
     override = Path(config.COC_DATA_DIR) / "kp_prompt.txt"
@@ -389,15 +422,22 @@ def kp_chat(
     is_character_action: bool,
     session_id: Optional[str] = None,
     kp_prompt_override: Optional[str] = None,
+    map_list: Optional[list[dict]] = None,
+    map_image_path: Optional[str] = None,
     temperature: float = 0.85,
     top_p: float = 0.9,
 ) -> str:
-    """KP 模式对话。"""
+    """KP 模式对话。map_list 为全部地图名（供 prompt 注入），map_image_path 为按文件名匹配到的图像路径（可选传入）。"""
     system = (kp_prompt_override or _load_kp_prompt()).strip()
 
     parts = []
     if script_context.strip():
         parts.append(f"【剧本相关内容】\n{script_context}\n")
+
+    will_attach_image = bool(map_image_path and api_config.get_supports_vision())
+    if map_list:
+        map_block = _format_map_eval_prompt(map_list, will_attach_image=will_attach_image)
+        parts.append(map_block)
     if character_card and is_character_action:
         char_text = f"角色：{character_card.get('name','')}（{character_card.get('occupation','')}）\n"
         char_text += f"关键属性/技能摘要：{json.dumps(character_card.get('attributes',{}), ensure_ascii=False)}；技能：{json.dumps(character_card.get('skills',[])[:10], ensure_ascii=False)}\n"
@@ -407,11 +447,26 @@ def kp_chat(
         parts.append("【玩家向 KP 的询问】（未指定人物卡）：")
 
     parts.append(user_message)
-    user_content = "\n".join(parts)
+    user_content_text = "\n".join(parts)
+
+    # 若按文件名匹配到地图且模型支持多模态，传入该地图图像供 LLM 识别
+    image_data_uri = None
+    if will_attach_image and map_image_path:
+        image_data_uri = _image_to_data_uri(map_image_path)
 
     messages = [{"role": "system", "content": system}]
     for h in chat_history[-20:]:
         messages.append({"role": h["role"], "content": h.get("content", "")})
+
+    if image_data_uri:
+        # 多模态 content：先图后文
+        user_content = [
+            {"type": "image_url", "image_url": {"url": image_data_uri}},
+            {"type": "text", "text": user_content_text},
+        ]
+    else:
+        user_content = user_content_text
+
     messages.append({"role": "user", "content": user_content})
 
     reply = _call(messages, max_tokens=4000, temperature=temperature, top_p=top_p)

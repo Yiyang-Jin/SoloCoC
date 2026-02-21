@@ -15,6 +15,7 @@ The interface has a **sidebar** (left) and a **main area** (right).
 - **Dice:** Manual dice input (e.g. `1d100`, `3d6×5`) and Roll button
 - **KP Prompt:** Customize the Keeper’s system prompt
 - **Scripts:** Uploaded script list, Upload PDF Script
+- **Maps:** Uploaded map images, Upload Map Images
 
 ### Main Area
 
@@ -98,7 +99,19 @@ Uploaded scripts are parsed and indexed. The KP retrieves relevant passages duri
 
 ---
 
-## 6. KP Mode and Chat
+## 6. Maps
+
+Upload map images (PNG/JPG/WEBP/BMP); use standard filenames (e.g. "1-museum-gate.png"). On each turn: 1) **All map filenames** are injected into the prompt; KP judges applicability; 2) If the context (player input + script) matches a map filename, and the LLM supports vision, that map image is passed; 3) **Forces the KP to start the reply by**:
+
+1. **Deciding if any map applies** — if so, state “Applicable map: filename”; if not, “No applicable map”
+2. **Paraphrasing the player/character’s request**
+3. **Noting ambiguities or questions**
+
+Suited for long scenarios like "The Mask of Nyarlathotep" with many standard-named maps.
+
+---
+
+## 7. KP Mode and Chat
 
 ### Chat Modes
 
@@ -121,7 +134,7 @@ Uploaded scripts are parsed and indexed. The KP retrieves relevant passages duri
 
 ---
 
-## 7. Dice System
+## 8. Dice System
 
 ### Automatic Rolls in Chat
 
@@ -143,7 +156,7 @@ The KP can use special tags in replies; the system will roll and replace them wi
 
 ---
 
-## 8. Action Log
+## 9. Action Log
 
 - **Refresh:** Reload the current session log
 - **Export TXT:** Export the log as a text file for records or review
@@ -153,7 +166,7 @@ The log includes: player/character messages, KP replies, dice results, skill che
 
 ---
 
-## 9. KP Prompt Settings
+## 10. KP Prompt Settings
 
 Click **KP Prompt** to customize the Keeper’s system prompt.
 
@@ -163,7 +176,7 @@ Click **KP Prompt** to customize the Keeper’s system prompt.
 
 ---
 
-## 10. Typical Session Flow
+## 11. Typical Session Flow
 
 1. Open the app and ensure API Key is set in Settings
 2. Upload the scenario PDF you are running
@@ -176,7 +189,7 @@ Click **KP Prompt** to customize the Keeper’s system prompt.
 
 ---
 
-## 11. Quick Tips
+## 12. Quick Tips
 
 - **Cannot send messages:** Check that a script is selected
 - **API error:** Verify API Key and model in Settings

@@ -187,6 +187,17 @@ def get_provider() -> str:
     return (data.get("provider") or "bailian").strip()
 
 
+def get_supports_vision() -> bool:
+    """当前配置的 LLM 是否支持多模态（图像输入）。"""
+    provider = get_provider()
+    model = (get_model() or "").lower()
+    if provider == "bailian":
+        return "qwen3.5" in model or "qwen3-vl" in model or "qwen-vl" in model
+    if provider == "openai":
+        return "gpt-4" in model or "gpt-4o" in model
+    return False
+
+
 def has_api_key() -> bool:
     """检查是否已配置有效 API Key（对需要 Key 的 provider）。"""
     provider = get_provider()

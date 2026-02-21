@@ -21,6 +21,7 @@ DATA_DIR = os.path.join(_BASE, "data")
 COC_DATA_DIR = os.path.join(DATA_DIR, "coc")
 COC_CHARACTERS_DIR = os.path.join(COC_DATA_DIR, "characters")
 COC_SCRIPTS_DIR = os.path.join(COC_DATA_DIR, "scripts")
+COC_MAPS_DIR = os.path.join(COC_DATA_DIR, "maps")
 COC_SESSIONS_DIR = os.path.join(COC_DATA_DIR, "sessions")
 
 # KP 预制 prompt：优先读 data/coc/kp_prompt.txt，否则用 defaults/kp_prompt.txt

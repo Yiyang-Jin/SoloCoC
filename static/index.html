@@ -97,6 +97,8 @@
     }
     .char-list li:hover, .script-list li:hover { background: var(--surface2); }
     .char-list li.active, .script-list li.active { background: var(--accent); color: var(--bg); }
+    .map-list-item { display: flex; align-items: center; gap: 0.5rem; }
+    .map-list-item img { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; }
 
     .dice-panel {
       display: flex;
@@ -200,6 +202,13 @@
         <ul class="script-list" id="scriptList"></ul>
         <input type="file" id="scriptFile" accept=".pdf" style="display:none" />
         <button class="btn btn-secondary btn-sm" id="btnUploadScript" style="margin-top:0.5rem" data-i18n="uploadPdf">上传 PDF 剧本</button>
+      </div>
+      <div class="section">
+        <h3 data-i18n="maps">地图</h3>
+        <p id="mapHint" style="font-size:0.75rem;color:var(--text-dim);margin:0 0 0.4rem"></p>
+        <ul class="script-list" id="mapList"></ul>
+        <input type="file" id="mapFile" accept=".png,.jpg,.jpeg,.webp,.bmp" multiple style="display:none" />
+        <button class="btn btn-secondary btn-sm" id="btnUploadMap" style="margin-top:0.5rem" data-i18n="uploadMaps">上传地图图片</button>
       </div>
     </aside>
 
@@ -372,9 +381,10 @@
       document.getElementById('apiKeyHint').textContent = t('apiKeyHint');
       document.getElementById('kpPromptHint').textContent = t('kpPromptHint') + ' [ROLL:skill|value] [DICE:1d100]';
       document.getElementById('charFormHint').textContent = t('charFormHint');
+      document.getElementById('mapHint').textContent = t('mapHint');
       document.getElementById('langSelect').value = lang;
     }
-    const state = { sessionId: null, scriptId: null, characterId: null, characters: [], scripts: [] };
+    const state = { sessionId: null, scriptId: null, characterId: null, characters: [], scripts: [], maps: [] };
     function uid() { return 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9); }
     state.sessionId = uid();
 
@@ -407,6 +417,26 @@
       const ul = document.getElementById('scriptList');
       ul.innerHTML = list.length ? list.map(s => `<li class="${state.scriptId === s.id ? 'active' : ''}" data-id="${s.id}"><span>${escapeHtml(s.id)} (${(s.total_chars||0)} ${t('scriptChars')})</span></li>`).join('') : '<li style="color:var(--text-dim)">'+t('noScripts')+'</li>';
       ul.querySelectorAll('li[data-id]').forEach(li => { li.onclick = () => { state.scriptId = li.dataset.id; loadScripts(); }; });
+    }
+    async function loadMaps() {
+      const list = await fetch(API + '/maps').then(r => r.json());
+      state.maps = list;
+      const ul = document.getElementById('mapList');
+      const imgUrl = (id) => '/api/coc/maps/' + id + '/image';
+      ul.innerHTML = list.length ? list.map(m => {
+        const fn = escapeHtml(m.filename || m.map_id || '');
+        return `<li class="map-list-item" data-id="${m.map_id}">
+          <img src="${imgUrl(m.map_id)}" alt="" onerror="this.style.display='none'" />
+          <span style="flex:1">${fn}</span>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMap('${m.map_id}')">${t('delete')}</button>
+        </li>`;
+      }).join('') : '<li style="color:var(--text-dim)">'+t('noMaps')+'</li>';
+      ul.querySelectorAll('li[data-id]').forEach(li => { li.onclick = (e) => { if (e.target.closest('.btn-danger')) return; }; });
+    }
+    async function deleteMap(id) {
+      if (!confirm(t('confirmDelete'))) return;
+      await fetch(API + '/maps/' + id, { method: 'DELETE' });
+      loadMaps();
     }
 
     function showCharDetail(id) {
@@ -467,6 +497,20 @@
       const fd = new FormData(); fd.append('file', f);
       try { const r = await fetch(API + '/scripts/upload', { method: 'POST', body: fd }); alert(r.ok ? (await r.json()).message : t('uploadPdf')+' failed'); loadScripts(); } catch (e) { alert(e.message); }
       document.getElementById('scriptFile').value = '';
+    };
+    document.getElementById('btnUploadMap').onclick = () => document.getElementById('mapFile').click();
+    document.getElementById('mapFile').onchange = async () => {
+      const files = document.getElementById('mapFile').files;
+      if (!files || !files.length) return;
+      let ok = 0, err = 0;
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const fd = new FormData(); fd.append('file', f);
+        try { const r = await fetch(API + '/maps/upload', { method: 'POST', body: fd }); if (r.ok) ok++; else err++; } catch (e) { err++; }
+      }
+      alert(t('imported') + ' ' + ok + (err ? ', ' + t('importFailed') + ': ' + err : ''));
+      loadMaps();
+      document.getElementById('mapFile').value = '';
     };
 
     document.querySelectorAll('input[name="chatMode"]').forEach(radio => { radio.onchange = () => { document.getElementById('charSelectWrap').style.display = radio.value === 'character' ? 'block' : 'none'; }; });
@@ -604,7 +648,7 @@
     document.getElementById('btnNewSession').onclick = () => { if (!confirm(t('newSessionConfirm'))) return; state.sessionId = uid(); loadActionLog(); document.getElementById('chatMessages').innerHTML = '<div style="color:var(--text-dim);font-style:italic">'+t('newSessionStarted')+'</div>'; };
 
     applyLang();
-    loadChars(); loadScripts(); loadActionLog();
+    loadChars(); loadScripts(); loadMaps(); loadActionLog();
   </script>
 </body>
 </html>

@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CoC Keeper Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --surface: #16161a;
+      --surface2: #1e1e24;
+      --text: #e4e2de;
+      --text-dim: #8a8580;
+      --accent: #9a7b4f;
+      --accent-hover: #b8956a;
+      --border: #2a2a32;
+      --danger: #c75c5c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Crimson Pro', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 300px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem;
+      overflow-y: auto;
+    }
+    .main { flex: 1; padding: 2rem; overflow-y: auto; display: flex; flex-direction: column; }
+
+    h1, h2, h3 { font-weight: 600; }
+    h1 { font-size: 1.4rem; margin: 0 0 1.5rem; color: var(--accent); }
+    h2 { font-size: 1.15rem; margin: 1.25rem 0 0.6rem; }
+    h3 { font-size: 1rem; margin: 0.75rem 0 0.4rem; color: var(--text-dim); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: var(--bg); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-danger { background: var(--danger); color: #fff; padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+    .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+
+    input[type="text"], input[type="number"], textarea, select {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface2);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .section { margin-bottom: 1rem; }
+    .section label { display: block; margin-bottom: 0.35rem; color: var(--text-dim); font-size: 0.85rem; }
+
+    .char-list, .script-list { list-style: none; padding: 0; margin: 0; }
+    .char-list li, .script-list li {
+      padding: 0.5rem 0.75rem;
+      margin: 0.2rem 0;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .char-list li:hover, .script-list li:hover { background: var(--surface2); }
+    .char-list li.active, .script-list li.active { background: var(--accent); color: var(--bg); }
+
+    .dice-panel {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .dice-result { font-family: 'JetBrains Mono', monospace; background: var(--surface2); padding: 0.5rem 1rem; border-radius: 6px; margin-top: 0.5rem; }
+
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      min-height: 300px;
+    }
+    .chat-msg { margin-bottom: 1rem; }
+    .chat-msg .role { font-size: 0.8rem; color: var(--accent); margin-bottom: 0.25rem; }
+    .chat-msg .content { white-space: pre-wrap; }
+    .chat-msg.user .role { color: var(--text-dim); }
+
+    .chat-input-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+    }
+    .chat-input-row textarea { flex: 1; min-height: 80px; }
+    .chat-mode-select { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+    .chat-mode-select label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+
+    .char-preview { font-size: 0.85rem; max-height: 200px; overflow-y: auto; background: var(--surface2); padding: 0.75rem; border-radius: 6px; }
+    .char-sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 900px) { .char-sheet { grid-template-columns: 1fr; } }
+
+    .action-log { max-height: 300px; overflow-y: auto; font-size: 0.9rem; }
+    .log-entry { padding: 0.5rem 0.75rem; margin: 0.25rem 0; border-radius: 4px; border-left: 3px solid var(--border); }
+    .log-entry.chat_user { border-left-color: var(--text-dim); }
+    .log-entry.chat_kp { border-left-color: var(--accent); }
+    .log-entry.dice { border-left-color: #7cb87c; }
+    .log-entry.skill_check { border-left-color: #7cb87c; }
+    .log-entry .log-time { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.2rem; }
+    code { background: var(--surface2); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.85em; }
+    .char-form-section { margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .char-form-section h3 { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .form-row .section { flex: 1; min-width: 120px; }
+    .attr-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.5rem; }
+    .attr-item { display: flex; flex-direction: column; }
+    .attr-item label { font-size: 0.8rem; }
+    .attr-item input { max-width: 4rem; padding: 0.35rem; }
+    .derived-row input { max-width: 3.5rem; padding: 0.25rem; font-size: 0.85rem; }
+    .derived-row .readonly { opacity: 0.9; }
+    @media (max-width: 700px) { .attr-grid { grid-template-columns: repeat(4, 1fr); } }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h1 id="appTitle" style="margin:0">CoC 跑团助手</h1>
+        <div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnLang" title="Language">EN</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnSettings">⚙</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3 data-i18n="chars">人物卡</h3>
+        <ul class="char-list" id="charList"></ul>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
+          <button class="btn btn-primary btn-sm" id="btnNewChar" data-i18n="newChar">+ 新建/生成</button>
+          <button class="btn btn-secondary btn-sm" id="btnImportChar" data-i18n="import">导入</button>
+        </div>
+        <input type="file" id="charImportFile" accept=".pdf,.json,.txt,.md,.html,.htm,.docx,.doc" style="display:none" />
+      </div>
+
+      <div class="section">
+        <h3 data-i18n="dice">骰子</h3>
+        <p id="diceHint" style="font-size:0.75rem;color:var(--text-dim);margin:0 0 0.4rem"></p>
+        <div class="dice-panel">
+          <input type="text" id="diceExpr" placeholder="1d100, 3d6×5" style="width:120px" />
+          <button class="btn btn-secondary btn-sm" id="btnRoll" data-i18n="roll">投骰</button>
+        </div>
+        <div class="dice-result" id="diceResult" style="display:none"></div>
+      </div>
+
+      <div class="section">
+        <button class="btn btn-secondary btn-sm" id="btnKpPrompt" style="width:100%" data-i18n="kpPrompt">KP Prompt 设置</button>
+      </div>
+      <div class="section">
+        <h3 data-i18n="scripts">剧本</h3>
+        <ul class="script-list" id="scriptList"></ul>
+        <input type="file" id="scriptFile" accept=".pdf" style="display:none" />
+        <button class="btn btn-secondary btn-sm" id="btnUploadScript" style="margin-top:0.5rem" data-i18n="uploadPdf">上传 PDF 剧本</button>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="card">
+        <h2 data-i18n="kpMode">KP 模式</h2>
+        <p id="kpDesc" style="color:var(--text-dim);font-size:0.9rem;margin:0 0 1rem"></p>
+        <div class="section" id="kpSessionSection">
+          <div class="chat-mode-select">
+            <label><input type="radio" name="chatMode" value="character" /><span data-i18n="charAction">指定人物卡行动</span></label>
+            <label><input type="radio" name="chatMode" value="player" checked /><span data-i18n="playerAsk">玩家询问 KP</span></label>
+          </div>
+          <div id="charSelectWrap" style="display:none;margin-bottom:0.5rem">
+            <label data-i18n="selectChar">选择人物卡</label>
+            <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+              <select id="kpCharSelect"></select>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnInferAction" data-i18n="inferAction">AI 推断行动</button>
+            </div>
+          </div>
+          <div class="chat-area">
+            <div class="chat-messages" id="chatMessages">
+              <div id="startChatHint" style="color:var(--text-dim);font-style:italic"></div>
+            </div>
+            <div class="chat-input-row">
+              <textarea id="chatInput"></textarea>
+              <button class="btn btn-primary" id="btnSend" data-i18n="send">发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="actionLogCard">
+        <h2 data-i18n="actionLog">行动日志</h2>
+        <p id="actionLogDesc" style="color:var(--text-dim);font-size:0.85rem;margin:0 0 0.75rem"></p>
+        <div class="action-log" id="actionLogContent"></div>
+        <div style="margin-top:0.5rem">
+          <button class="btn btn-secondary btn-sm" id="btnRefreshLog" data-i18n="refresh">刷新</button>
+          <button class="btn btn-secondary btn-sm" id="btnExportLog" data-i18n="exportTxt">导出 TXT</button>
+          <button class="btn btn-secondary btn-sm" id="btnNewSession" data-i18n="newSession">新会话</button>
+        </div>
+      </div>
+
+      <div class="card" id="charDetailCard" style="display:none">
+        <h2><span data-i18n="charDetail">人物卡详情</span> <button type="button" class="btn btn-secondary btn-sm" id="btnEditChar" data-i18n="edit">编辑</button></h2>
+        <div id="charDetailContent"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="charGenModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem" class="modal-overlay">
+    <div class="card" style="max-width:800px;width:100%;margin:1rem">
+      <h2 id="charFormTitle" data-i18n="newCharForm">新建人物卡</h2>
+      <p id="charFormHint" style="color:var(--text-dim);font-size:0.85rem;margin:0 0 1rem"></p>
+      <div class="char-form-section">
+        <h3 data-i18n="basicInfo">基本信息</h3>
+        <div class="form-row">
+          <div class="section"><label data-i18n="name">姓名</label><input type="text" id="cfName" /></div>
+          <div class="section"><label data-i18n="age">年龄</label><input type="number" id="cfAge" min="15" max="99" value="30" /></div>
+          <div class="section"><label data-i18n="occupation">职业</label><select id="cfOccupation"></select></div>
+          <div class="section"><label data-i18n="nationality">国籍</label><input type="text" id="cfNationality" placeholder="USA" /></div>
+        </div>
+      </div>
+      <div class="char-form-section">
+        <h3><span data-i18n="attrs">属性</span> <button type="button" class="btn btn-secondary btn-sm" id="btnRollAttrs" data-i18n="rollAttrs">投属性</button></h3>
+        <div class="attr-grid">
+          <div class="attr-item"><label>STR</label><input type="number" id="cfSTR" min="0" /></div>
+          <div class="attr-item"><label>CON</label><input type="number" id="cfCON" min="0" /></div>
+          <div class="attr-item"><label>SIZ</label><input type="number" id="cfSIZ" min="0" /></div>
+          <div class="attr-item"><label>DEX</label><input type="number" id="cfDEX" min="0" /></div>
+          <div class="attr-item"><label>INT</label><input type="number" id="cfINT" min="0" /></div>
+          <div class="attr-item"><label>APP</label><input type="number" id="cfAPP" min="0" /></div>
+          <div class="attr-item"><label>POW</label><input type="number" id="cfPOW" min="0" /></div>
+          <div class="attr-item"><label>EDU</label><input type="number" id="cfEDU" min="0" /></div>
+        </div>
+        <div class="form-row derived-row">
+          <span>派生：SAN <input type="number" id="cfSAN" readonly class="readonly" /> HP <input type="number" id="cfHP" readonly class="readonly" /> MP <input type="number" id="cfMP" readonly class="readonly" /> DB <input type="number" id="cfDB" readonly class="readonly" /> Build <input type="number" id="cfBuild" readonly class="readonly" /> MOVE <input type="number" id="cfMOVE" readonly class="readonly" /> Luck <input type="number" id="cfLuck" placeholder="投3D6×5" /><button type="button" class="btn btn-secondary btn-sm" id="btnRollLuck">投</button></span>
+        </div>
+      </div>
+      <div class="char-form-section">
+        <h3><span data-i18n="skills">技能</span> <button type="button" class="btn btn-secondary btn-sm" id="btnAiSkills" data-i18n="aiSkills">AI 辅助分配</button></h3>
+        <textarea id="cfSkills" rows="8" placeholder="母语(英语):80&#10;侦查:60&#10;..."></textarea>
+      </div>
+      <div class="char-form-section">
+        <h3 data-i18n="combat">战斗</h3>
+        <div class="form-row">
+          <div class="section"><label data-i18n="brawl">斗殴</label><input type="number" id="cfBrawl" min="0" placeholder="%" /></div>
+          <div class="section"><label data-i18n="damage">伤害</label><input type="text" id="cfBrawlDmg" placeholder="1D3" /></div>
+          <div class="section"><label data-i18n="dodge">闪避</label><input type="number" id="cfDodge" min="0" placeholder="%" /></div>
+        </div>
+        <input type="text" id="cfCombatExtra" placeholder="手枪:50 1D10（可选）" style="margin-top:0.25rem" />
+      </div>
+      <div class="char-form-section">
+        <h3><span data-i18n="persona">人设</span> <button type="button" class="btn btn-secondary btn-sm" id="btnAiPersona" data-i18n="aiPersona">AI 生成人设</button></h3>
+        <div class="section"><label data-i18n="background">背景故事</label><textarea id="cfBackground" rows="4"></textarea></div>
+        <div class="section"><label data-i18n="appearance">形象</label><input type="text" id="cfAppearance" /></div>
+        <div class="section"><label data-i18n="traits">特质</label><input type="text" id="cfTraits" /></div>
+        <div class="section"><label data-i18n="beliefs">信念</label><input type="text" id="cfBeliefs" /></div>
+        <div class="section"><label data-i18n="treasure">宝贵之物</label><input type="text" id="cfTreasure" /></div>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem">
+        <button class="btn btn-primary" id="btnSaveChar" data-i18n="save">保存</button>
+        <button class="btn btn-secondary" id="btnCloseGen" data-i18n="cancel">取消</button>
+      </div>
+      <div id="genStatus" style="margin-top:0.5rem;font-size:0.9rem"></div>
+    </div>
+  </div>
+
+  <div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:101;align-items:center;justify-content:center;overflow:auto;padding:2rem" class="modal-overlay">
+    <div class="card" style="max-width:520px;width:100%;margin:1rem">
+      <h2 data-i18n="settings">设置</h2>
+      <div class="section">
+        <label data-i18n="llmProvider">LLM 提供商</label>
+        <select id="providerSelect"></select>
+      </div>
+      <div class="section" id="baseUrlSection" style="display:none">
+        <label data-i18n="llmBaseUrl">API 地址</label>
+        <input type="text" id="baseUrlInput" placeholder="https://api.example.com/v1" />
+      </div>
+      <div class="section">
+        <label data-i18n="llmModel">模型</label>
+        <input type="text" id="modelInput" placeholder="qwen3.5-plus" />
+      </div>
+      <div class="section">
+        <label data-i18n="apiKey">API Key</label>
+        <input type="password" id="apiKeyInput" placeholder="sk-xxxx..." autocomplete="off" />
+        <p id="apiKeyHint" style="font-size:0.8rem;color:var(--text-dim);margin:0.35rem 0 0"></p>
+      </div>
+      <div class="section">
+        <label data-i18n="lang">语言</label>
+        <select id="langSelect">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem">
+        <button class="btn btn-primary" id="btnSaveSettings" data-i18n="save">保存</button>
+        <button class="btn btn-secondary" id="btnCloseSettings" data-i18n="cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="kpPromptModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;overflow:auto;padding:2rem" class="modal-overlay">
+    <div class="card" style="max-width:700px;width:100%;margin:1rem">
+      <h2 data-i18n="kpPromptTitle">KP Prompt 设置</h2>
+      <p id="kpPromptHint" style="color:var(--text-dim);font-size:0.85rem;margin:0 0 0.75rem"></p>
+      <textarea id="kpPromptInput" style="min-height:280px;font-size:0.9rem"></textarea>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem">
+        <button class="btn btn-primary" id="btnSaveKpPrompt" data-i18n="save">保存</button>
+        <button class="btn btn-secondary" id="btnResetKpPrompt" data-i18n="resetDefault">恢复默认</button>
+        <button class="btn btn-secondary" id="btnCloseKpPrompt" data-i18n="cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/i18n.js"></script>
+  <script>
+    const API = '/api/coc';
+    let lang = localStorage.getItem('coc_lang') || 'zh';
+    function t(k) { return (LANG[lang] || LANG.zh)[k] || k; }
+    function applyLang() {
+      document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.getElementById('appTitle').textContent = t('appTitle');
+      document.getElementById('btnLang').textContent = lang === 'zh' ? 'EN' : '中';
+      document.getElementById('diceHint').textContent = t('diceHint');
+      document.getElementById('kpDesc').textContent = t('kpDesc');
+      document.getElementById('actionLogDesc').textContent = t('actionLogDesc');
+      document.getElementById('startChatHint').textContent = t('startChatHint');
+      document.getElementById('chatInput').placeholder = t('chatPlaceholder');
+      document.getElementById('apiKeyInput').placeholder = t('apiKeyPlaceholder');
+      document.getElementById('apiKeyHint').textContent = t('apiKeyHint');
+      document.getElementById('kpPromptHint').textContent = t('kpPromptHint') + ' [ROLL:skill|value] [DICE:1d100]';
+      document.getElementById('charFormHint').textContent = t('charFormHint');
+      document.getElementById('langSelect').value = lang;
+    }
+    const state = { sessionId: null, scriptId: null, characterId: null, characters: [], scripts: [] };
+    function uid() { return 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9); }
+    state.sessionId = uid();
+
+    async function fetchJSON(url, opts = {}) {
+      const r = await fetch(url, { headers: { 'Content-Type': 'application/json', ...opts.headers }, ...opts });
+      if (!r.ok) {
+        const t = await r.text();
+        let msg = r.statusText;
+        try { const j = JSON.parse(t); msg = j.detail || (Array.isArray(j.detail) ? j.detail[0]?.msg : '') || t; } catch (_) { msg = t || msg; }
+        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+      }
+      return r.json();
+    }
+    function escapeHtml(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    async function loadChars() {
+      const list = await fetch(API + '/characters').then(r => r.json());
+      state.characters = list;
+      const ul = document.getElementById('charList');
+      ul.innerHTML = list.map(c => `<li class="${state.characterId === c.id ? 'active' : ''}" data-id="${c.id}"><span>${escapeHtml(c.name || t('unnamed'))}</span><button class="btn btn-danger btn-sm" data-id="${c.id}" onclick="event.stopPropagation();deleteChar(event,'${c.id}')">${t('delete')}</button></li>`).join('');
+      ul.querySelectorAll('li[data-id]').forEach(li => { li.onclick = (e) => { if (e.target.closest('.btn-danger')) return; state.characterId = li.dataset.id; loadChars(); showCharDetail(state.characterId); }; });
+      const sel = document.getElementById('kpCharSelect');
+      sel.innerHTML = '<option value="">'+t('selectCharOpt')+'</option>' + list.map(c => `<option value="${c.id}">${escapeHtml(c.name || t('unnamed'))}</option>`).join('');
+    }
+    async function deleteChar(ev, id) { ev.stopPropagation(); if (!confirm(t('confirmDelete'))) return; await fetch(API + '/characters/' + id, { method: 'DELETE' }); if (state.characterId === id) state.characterId = null; loadChars(); document.getElementById('charDetailCard').style.display = 'none'; }
+
+    async function loadScripts() {
+      const list = await fetch(API + '/scripts').then(r => r.json());
+      state.scripts = list;
+      const ul = document.getElementById('scriptList');
+      ul.innerHTML = list.length ? list.map(s => `<li class="${state.scriptId === s.id ? 'active' : ''}" data-id="${s.id}"><span>${escapeHtml(s.id)} (${(s.total_chars||0)} ${t('scriptChars')})</span></li>`).join('') : '<li style="color:var(--text-dim)">'+t('noScripts')+'</li>';
+      ul.querySelectorAll('li[data-id]').forEach(li => { li.onclick = () => { state.scriptId = li.dataset.id; loadScripts(); }; });
+    }
+
+    function showCharDetail(id) {
+      if (!id) { document.getElementById('charDetailCard').style.display = 'none'; return; }
+      fetch(API + '/characters/' + id).then(r => r.json()).then(c => {
+        const el = document.getElementById('charDetailContent');
+        const attrs = c.attributes || {};
+        const skills = (c.skills || []).map(s => `${s.name} ${s.value}%`).join('；');
+        const combat = (c.combat || []).map(s => `${s.name} ${s.value}%`).join('；');
+        el.innerHTML = `<div class="char-sheet"><div><p><strong>${escapeHtml(c.name || '')}</strong> ${c.age || ''}${t('yearOld')} / ${escapeHtml(c.occupation || '')} / ${escapeHtml(c.nationality || '')}</p><p><strong>${t('attrsLabel')}</strong> STR ${attrs.STR} CON ${attrs.CON} SIZ ${attrs.SIZ} DEX ${attrs.DEX} INT ${attrs.INT} APP ${attrs.APP} POW ${attrs.POW} EDU ${attrs.EDU}</p><p><strong>${t('hp')}</strong> ${attrs.HP} <strong>${t('mp')}</strong> ${attrs.MP} <strong>${t('san')}</strong> ${attrs.SAN}</p><p><strong>${t('skillsLabel')}</strong> ${escapeHtml(skills)}</p><p><strong>${t('combatLabel')}</strong> ${escapeHtml(combat)}</p></div><div><p><strong>${t('background')}</strong></p><p style="white-space:pre-wrap">${escapeHtml((c.background||'').slice(0,500))}${(c.background||'').length>500?'…':''}</p></div></div>`;
+        document.getElementById('charDetailCard').style.display = 'block';
+      }).catch(() => {});
+    }
+
+    document.getElementById('btnEditChar').onclick = async () => {
+      if (!state.characterId) return;
+      const c = await fetch(API + '/characters/' + state.characterId).then(r => r.json()).catch(() => null);
+      if (!c) return;
+      let cocConstants = { skills: [], occupations: [] };
+      try { cocConstants = await fetch(API + '/constants').then(r => r.json()); } catch (e) {}
+      const sel = document.getElementById('cfOccupation');
+      const occs = cocConstants.occupations || [];
+      sel.innerHTML = '<option value="">'+t('selectOccOpt')+'</option>' + occs.map(o => `<option value="${escapeHtml(o)}" ${c.occupation === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('');
+      const a = c.attributes || {};
+      ['Name','Age','Nationality','STR','CON','SIZ','DEX','INT','APP','POW','EDU','SAN','HP','MP','DB','Build','MOVE'].forEach(k => {
+        const id = 'cf' + (k === 'Name' ? 'Name' : k === 'Age' ? 'Age' : k === 'Nationality' ? 'Nationality' : k);
+        const el = document.getElementById(id); if (el) el.value = k === 'Name' ? (c.name || '') : k === 'Age' ? (c.age || '') : k === 'Nationality' ? (c.nationality || '') : (a[k] ?? '');
+      });
+      document.getElementById('cfLuck').value = a.Luck || '';
+      document.getElementById('cfSkills').value = (c.skills || []).map(s => `${s.name}:${s.value}`).join('\n');
+      const combat = c.combat || [];
+      document.getElementById('cfBrawl').value = combat.find(x => x.name === '斗殴')?.value || '';
+      document.getElementById('cfBrawlDmg').value = combat.find(x => x.name === '斗殴')?.damage || '';
+      document.getElementById('cfDodge').value = combat.find(x => x.name === '闪避')?.value || '';
+      document.getElementById('cfBackground').value = c.background || '';
+      document.getElementById('cfAppearance').value = c.appearance || '';
+      document.getElementById('cfTraits').value = c.traits || '';
+      document.getElementById('cfBeliefs').value = c.beliefs || '';
+      document.getElementById('cfTreasure').value = c.treasure || '';
+      state.editingCharId = state.characterId;
+      document.getElementById('charFormTitle').textContent = t('editCharForm');
+      document.getElementById('charGenModal').style.display = 'flex';
+      calcDerived();
+    };
+
+    document.getElementById('btnRoll').onclick = async () => {
+      const expr = document.getElementById('diceExpr').value.trim() || '1d100';
+      try {
+        const r = await fetchJSON(API + '/dice/roll', { method: 'POST', body: JSON.stringify({ expr, session_id: state.sessionId }) });
+        const el = document.getElementById('diceResult'); el.textContent = `${r.description} → ${t('result')}: ${r.result}`; el.style.display = 'block';
+        loadActionLog();
+      } catch (e) { document.getElementById('diceResult').textContent = t('error') + ': ' + e.message; document.getElementById('diceResult').style.display = 'block'; }
+    };
+
+    document.getElementById('btnUploadScript').onclick = () => document.getElementById('scriptFile').click();
+    document.getElementById('scriptFile').onchange = async () => {
+      const f = document.getElementById('scriptFile').files?.[0]; if (!f) return;
+      const fd = new FormData(); fd.append('file', f);
+      try { const r = await fetch(API + '/scripts/upload', { method: 'POST', body: fd }); alert(r.ok ? (await r.json()).message : t('uploadPdf')+' failed'); loadScripts(); } catch (e) { alert(e.message); }
+      document.getElementById('scriptFile').value = '';
+    };
+
+    document.querySelectorAll('input[name="chatMode"]').forEach(radio => { radio.onchange = () => { document.getElementById('charSelectWrap').style.display = radio.value === 'character' ? 'block' : 'none'; }; });
+
+    document.getElementById('btnInferAction').onclick = async () => {
+      const charId = document.getElementById('kpCharSelect').value; if (!charId) { alert(t('pleaseSelectChar')); return; }
+      const st = document.getElementById('btnInferAction'); st.disabled = true; st.textContent = t('inferring');
+      try { const r = await fetchJSON(API + '/characters/infer-action', { method: 'POST', body: JSON.stringify({ character_id: charId, session_id: state.sessionId, script_id: state.scriptId || null }) }); document.getElementById('chatInput').value = (document.getElementById('chatInput').value.trim() ? document.getElementById('chatInput').value + '\n' : '') + (r.action || ''); } catch (e) { alert(e.message); }
+      st.disabled = false; st.textContent = t('inferAction');
+    };
+
+    document.getElementById('btnSend').onclick = sendChat;
+    document.getElementById('chatInput').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } };
+
+    async function sendChat() {
+      const msg = document.getElementById('chatInput').value.trim(); if (!msg) return;
+      if (!state.scriptId) { alert(t('pleaseUploadScript')); return; }
+      const mode = document.querySelector('input[name="chatMode"]:checked').value;
+      const charId = mode === 'character' ? document.getElementById('kpCharSelect').value : null;
+      const msgs = document.getElementById('chatMessages');
+      const firstHint = msgs.querySelector('[style*="italic"]'); if (firstHint) firstHint.remove();
+      msgs.innerHTML += `<div class="chat-msg user"><div class="role">${charId ? t('roleAction') : t('playerAsk')}</div><div class="content">${escapeHtml(msg)}</div></div>`;
+      document.getElementById('chatInput').value = ''; msgs.scrollTop = msgs.scrollHeight;
+      const btn = document.getElementById('btnSend'); btn.disabled = true;
+      try {
+        const r = await fetchJSON(API + '/kp/chat', { method: 'POST', body: JSON.stringify({ session_id: state.sessionId, script_id: state.scriptId, message: msg, character_id: charId || null, is_character_action: !!charId }) });
+        msgs.innerHTML += `<div class="chat-msg"><div class="role">KP</div><div class="content">${escapeHtml(r.reply).replace(/\n/g, '<br>')}</div></div>`;
+        loadActionLog();
+      } catch (e) { msgs.innerHTML += `<div class="chat-msg user"><div class="role">${t('error')}</div><div class="content" style="color:var(--danger)">${escapeHtml(e.message)}</div></div>`; }
+      msgs.scrollTop = msgs.scrollHeight; btn.disabled = false;
+    }
+
+    document.getElementById('btnImportChar').onclick = () => document.getElementById('charImportFile').click();
+    document.getElementById('charImportFile').onchange = async () => {
+      const f = document.getElementById('charImportFile').files?.[0]; if (!f) return;
+      const fd = new FormData(); fd.append('file', f);
+      try { const r = await fetch(API + '/characters/import', { method: 'POST', body: fd }); const data = await r.json().catch(() => ({})); if (!r.ok) throw new Error(data.detail || data.message || r.statusText); alert(t('imported') + ' ' + (data.imported || 0) + t('charsCount')); loadChars(); } catch (e) { alert(t('importFailed') + ': ' + (e.message || String(e))); }
+      document.getElementById('charImportFile').value = '';
+    };
+
+    let cocConstants = { skills: [], occupations: [] };
+    async function loadConstants() { try { cocConstants = await fetch(API + '/constants').then(r => r.json()); } catch (e) {} }
+    function calcDerived() {
+      const CON = parseInt(document.getElementById('cfCON')?.value) || 0; const SIZ = Math.max(parseInt(document.getElementById('cfSIZ')?.value) || 0, 6);
+      const DEX = parseInt(document.getElementById('cfDEX')?.value) || 0; const POW = parseInt(document.getElementById('cfPOW')?.value) || 0; const STR = parseInt(document.getElementById('cfSTR')?.value) || 0;
+      const el = id => document.getElementById(id);
+      if (el('cfSAN')) el('cfSAN').value = POW * 5; if (el('cfHP')) el('cfHP').value = Math.floor((CON + SIZ) / 10); if (el('cfMP')) el('cfMP').value = Math.floor(POW / 5);
+      const total = STR + SIZ; let DB = 0, Build = 0;
+      if (total <= 64) DB = Build = -2; else if (total <= 84) DB = Build = -1; else if (total <= 164) DB = Build = total <= 124 ? 0 : 1; else DB = Build = 2;
+      if (el('cfDB')) el('cfDB').value = DB; if (el('cfBuild')) el('cfBuild').value = Build; if (el('cfMOVE')) el('cfMOVE').value = DEX >= SIZ ? 8 : 7;
+    }
+
+    document.getElementById('btnNewChar').onclick = async () => {
+      state.editingCharId = null; document.getElementById('charFormTitle').textContent = t('newCharForm');
+      await loadConstants();
+      document.getElementById('cfOccupation').innerHTML = '<option value="">'+t('selectOccOpt')+'</option>' + (cocConstants.occupations || []).map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+      document.getElementById('charGenModal').style.display = 'flex'; document.getElementById('genStatus').textContent = '';
+      calcDerived();
+    };
+    ['cfSTR','cfCON','cfSIZ','cfDEX','cfPOW'].forEach(id => { const el = document.getElementById(id); if (el) el.onchange = calcDerived; });
+
+    document.getElementById('btnRollAttrs').onclick = async () => {
+      try { const r = await fetchJSON(API + '/dice/roll-attributes', { method: 'POST' }); const a = r.attributes || {}, d = r.derived || {}; ['STR','CON','SIZ','DEX','INT','APP','POW','EDU'].forEach(k => { const e = document.getElementById('cf'+k); if (e) e.value = a[k] ?? ''; }); document.getElementById('cfSAN').value = d.SAN ?? ''; document.getElementById('cfHP').value = d.HP ?? ''; document.getElementById('cfMP').value = d.MP ?? ''; document.getElementById('cfDB').value = d.DB ?? ''; document.getElementById('cfBuild').value = d.Build ?? ''; document.getElementById('cfMOVE').value = d.MOVE ?? ''; document.getElementById('cfLuck').value = d.Luck ?? ''; } catch (e) { alert(e.message); }
+    };
+    document.getElementById('btnRollLuck').onclick = async () => { try { const r = await fetchJSON(API + '/dice/roll', { method: 'POST', body: JSON.stringify({ expr: '3d6×5' }) }); document.getElementById('cfLuck').value = r.result; } catch (e) { alert(e.message); } };
+
+    document.getElementById('btnAiSkills').onclick = async () => {
+      const occ = document.getElementById('cfOccupation').value; if (!occ) { alert(t('pleaseSelectOcc')); return; }
+      try { const r = await fetchJSON(API + '/characters/suggest-skills', { method: 'POST', body: JSON.stringify({ occupation: occ, edu: parseInt(document.getElementById('cfEDU').value) || 65, int_val: parseInt(document.getElementById('cfINT').value) || 65 }) }); document.getElementById('cfSkills').value = (r.skills || []).map(s => `${s.name}:${s.value}`).join('\n'); } catch (e) { alert(e.message); }
+    };
+    document.getElementById('btnAiPersona').onclick = async () => {
+      try { const r = await fetchJSON(API + '/characters/persona', { method: 'POST', body: JSON.stringify({ name: document.getElementById('cfName').value, age: parseInt(document.getElementById('cfAge').value) || 30, occupation: document.getElementById('cfOccupation').value, nationality: document.getElementById('cfNationality').value }) }); document.getElementById('cfBackground').value = r.background || ''; document.getElementById('cfAppearance').value = r.appearance || ''; document.getElementById('cfTraits').value = r.traits || ''; document.getElementById('cfBeliefs').value = r.beliefs || ''; document.getElementById('cfTreasure').value = r.treasure || ''; } catch (e) { alert(e.message); }
+    };
+
+    document.getElementById('btnSaveChar').onclick = async () => {
+      function parseSkills(s) { const out = []; (s || '').split('\n').forEach(line => { const m = line.match(/([^:：]+)[:：]\s*(\d+)/); if (m) out.push({ name: m[1].trim(), value: parseInt(m[2]) }); }); return out; }
+      const el = id => document.getElementById(id); const a = {};
+      ['STR','CON','SIZ','DEX','INT','APP','POW','EDU','SAN','HP','MP','DB','Build','MOVE'].forEach(k => { a[k] = parseInt(el('cf'+k)?.value) || 0; }); a.Luck = isNaN(parseInt(el('cfLuck')?.value)) ? '投3D6×5' : parseInt(el('cfLuck').value);
+      const skills = parseSkills(el('cfSkills').value);
+      const combat = []; if (el('cfBrawl').value) combat.push({ name: '斗殴', value: parseInt(el('cfBrawl').value) || 0, damage: el('cfBrawlDmg').value || '1D3' }); if (el('cfDodge').value) combat.push({ name: '闪避', value: parseInt(el('cfDodge').value) || 0 });
+      const data = { name: el('cfName').value || t('unnamed'), age: parseInt(el('cfAge').value) || 0, occupation: el('cfOccupation').value || '', nationality: el('cfNationality').value || '', attributes: a, skills, combat, background: el('cfBackground').value || '', appearance: el('cfAppearance').value || '', traits: el('cfTraits').value || '', beliefs: el('cfBeliefs').value || '', treasure: el('cfTreasure').value || '' };
+      try { const body = state.editingCharId ? { id: state.editingCharId, data } : { data }; const res = await fetchJSON(API + '/characters', { method: 'POST', body: JSON.stringify(body) }); document.getElementById('charGenModal').style.display = 'none'; state.characterId = res.character_id; state.editingCharId = null; loadChars(); showCharDetail(res.character_id); } catch (e) { el('genStatus').textContent = t('saveFailed') + ': ' + e.message; el('genStatus').style.color = 'var(--danger)'; }
+    };
+    document.getElementById('btnCloseGen').onclick = () => { document.getElementById('charGenModal').style.display = 'none'; };
+
+    document.getElementById('btnKpPrompt').onclick = async () => { try { const r = await fetch(API + '/kp-prompt').then(x => x.json()); document.getElementById('kpPromptInput').value = r.prompt || ''; } catch (e) { document.getElementById('kpPromptInput').value = ''; } document.getElementById('kpPromptModal').style.display = 'flex'; };
+    document.getElementById('btnCloseKpPrompt').onclick = () => { document.getElementById('kpPromptModal').style.display = 'none'; };
+    document.getElementById('btnSaveKpPrompt').onclick = async () => { try { await fetchJSON(API + '/kp-prompt', { method: 'PUT', body: JSON.stringify({ prompt: document.getElementById('kpPromptInput').value }) }); alert(t('saved')); document.getElementById('kpPromptModal').style.display = 'none'; } catch (e) { alert(e.message); } };
+    document.getElementById('btnResetKpPrompt').onclick = async () => { if (!confirm(t('resetConfirm'))) return; try { const r = await fetch(API + '/kp-prompt', { method: 'DELETE' }).then(x => x.json()); document.getElementById('kpPromptInput').value = r.prompt || ''; alert(t('saved')); } catch (e) { alert(e.message); } };
+
+    document.getElementById('btnSettings').onclick = async () => {
+      try {
+        const cfg = await fetch('/api/config').then(r => r.json());
+        const provSel = document.getElementById('providerSelect');
+        const nameKey = lang === 'zh' ? 'name_zh' : 'name_en';
+        provSel.innerHTML = (cfg.providers || []).map(p => `<option value="${p.id}">${escapeHtml(p[nameKey] || p.id)}</option>`).join('');
+        provSel.value = cfg.provider || 'bailian';
+        document.getElementById('modelInput').value = cfg.model || '';
+        document.getElementById('baseUrlInput').value = cfg.base_url || '';
+        document.getElementById('apiKeyInput').value = cfg.api_key_set ? '********' : '';
+        document.getElementById('baseUrlSection').style.display = provSel.value === 'custom' ? 'block' : 'none';
+      } catch (e) {
+        document.getElementById('providerSelect').innerHTML = '<option value="bailian">阿里百炼</option>';
+        document.getElementById('apiKeyInput').value = '';
+      }
+      document.getElementById('settingsModal').style.display = 'flex';
+    };
+    document.getElementById('providerSelect').onchange = () => {
+      document.getElementById('baseUrlSection').style.display = document.getElementById('providerSelect').value === 'custom' ? 'block' : 'none';
+    };
+    document.getElementById('btnCloseSettings').onclick = () => { document.getElementById('settingsModal').style.display = 'none'; };
+    document.getElementById('btnSaveSettings').onclick = async () => {
+      const provider = document.getElementById('providerSelect').value;
+      const model = document.getElementById('modelInput').value.trim();
+      const baseUrl = document.getElementById('baseUrlInput').value.trim();
+      const key = document.getElementById('apiKeyInput').value.trim();
+      const payload = { provider, model: model || undefined, base_url: provider === 'custom' ? (baseUrl || undefined) : undefined };
+      if (key && key !== '********') payload.api_key = key;
+      try {
+        await fetchJSON('/api/config', { method: 'PUT', body: JSON.stringify(payload) });
+      } catch (e) { alert(e.message); return; }
+      const newLang = document.getElementById('langSelect').value;
+      if (newLang !== lang) { lang = newLang; localStorage.setItem('coc_lang', lang); applyLang(); }
+      document.getElementById('settingsModal').style.display = 'none';
+      alert(t('saved'));
+    };
+    document.getElementById('btnLang').onclick = () => { lang = lang === 'zh' ? 'en' : 'zh'; localStorage.setItem('coc_lang', lang); applyLang(); };
+
+    async function loadActionLog() {
+      const el = document.getElementById('actionLogContent');
+      try { const log = await fetch(API + '/sessions/' + state.sessionId + '/log').then(r => r.json()); if (!log.length) { el.innerHTML = '<div style="color:var(--text-dim);font-style:italic">'+t('noRecords')+'</div>'; return; } el.innerHTML = log.map(e => { const tm = (e.time || '').slice(11, 19); if (e.type === 'chat_user') return `<div class="log-entry chat_user"><div class="log-time">${tm}</div><strong>${e.character_name ? '['+escapeHtml(e.character_name)+']' : '['+t('player')+']'}</strong> ${escapeHtml(e.content)}</div>`; if (e.type === 'chat_kp') return `<div class="log-entry chat_kp"><div class="log-time">${tm}</div><strong>KP</strong><br>${escapeHtml(e.content).replace(/\n/g, '<br>')}</div>`; if (e.type === 'dice') return `<div class="log-entry dice"><div class="log-time">${tm}</div>${t('dice')} ${escapeHtml(e.expr)}: ${e.description} → ${e.result}</div>`; if (e.type === 'skill_check') return `<div class="log-entry skill_check"><div class="log-time">${tm}</div>${e.description} → ${e.success?'✓':'✗'}</div>`; return ''; }).join(''); } catch (err) { el.innerHTML = '<div style="color:var(--text-dim)">'+t('noRecords')+'</div>'; }
+    }
+    document.getElementById('btnRefreshLog').onclick = loadActionLog;
+    document.getElementById('btnExportLog').onclick = () => { fetch(API + '/sessions/' + state.sessionId + '/log').then(r => r.json()).then(log => { const lines = log.map(e => { const tm = (e.time || '').slice(0, 19); if (e.type === 'chat_user') return `[${tm}] ${e.character_name ? '['+e.character_name+']' : '['+t('player')+']'}: ${e.content}`; if (e.type === 'chat_kp') return `[${tm}] KP:\n${e.content}`; if (e.type === 'dice') return `[${tm}] ${t('dice')} ${e.expr}: ${e.result}`; if (e.type === 'skill_check') return `[${tm}] ${e.success?'✓':'✗'}`; return ''; }); const blob = new Blob([lines.join('\n\n')], { type: 'text/plain;charset=utf-8' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'coc_log_' + state.sessionId + '.txt'; a.click(); URL.revokeObjectURL(a.href); }).catch(() => alert(t('exportFailed'))); };
+    document.getElementById('btnNewSession').onclick = () => { if (!confirm(t('newSessionConfirm'))) return; state.sessionId = uid(); loadActionLog(); document.getElementById('chatMessages').innerHTML = '<div style="color:var(--text-dim);font-style:italic">'+t('newSessionStarted')+'</div>'; };
+
+    applyLang();
+    loadChars(); loadScripts(); loadActionLog();
+  </script>
+</body>
+</html>
